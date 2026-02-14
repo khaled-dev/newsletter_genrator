@@ -53,6 +53,11 @@ class NewsSyncRun extends Model
         return $query->where('started_at', '>=', now()->subDays($days));
     }
 
+    public function scopeRecentHours(Builder $query, int $hours = 24): Builder
+    {
+        return $query->where('started_at', '>=', now()->subHours($hours));
+    }
+
     public function getDurationAttribute(): ?int
     {
         if ($this->started_at && $this->completed_at) {
