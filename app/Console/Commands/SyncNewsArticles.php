@@ -4,6 +4,9 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use App\Services\NewsSyncService;
+use App\Services\NewsSource\NewsAPIGateway;
+use App\Services\NewsSource\NyTimesGateway;
+use App\Services\NewsSource\GuardianGateway;
 
 class SyncNewsArticles extends Command
 {
@@ -86,9 +89,9 @@ class SyncNewsArticles extends Command
     protected function createGateway(string $source): object
     {
         return match($source) {
-            'guardian' => new \App\Services\NewsSource\GuardianGateway(),
-            'news_api' => new \App\Services\NewsSource\NewsAPIGateway(),
-            'ny_times' => new \App\Services\NewsSource\NyTimesGateway(),
+            'guardian' => new GuardianGateway(),
+            'news_api' => new NewsAPIGateway(),
+            'ny_times' => new NyTimesGateway(),
             default => throw new \InvalidArgumentException("Unknown source: {$source}")
         };
     }

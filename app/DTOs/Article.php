@@ -6,11 +6,11 @@ namespace App\DTOs;
 /**
  * @method string getExternalId()
  * @method string getTitle()
- * @method ?string getDescription()
- * @method ?string getContent()
- * @method ?string getUrl()
- * @method ?string getImageUrl()
- * @method ?string getAuthorName()
+ * @method string|null getDescription()
+ * @method string|null getContent()
+ * @method string|null getUrl()
+ * @method string|null getImageUrl()
+ * @method string|null getAuthorName()
  * @method string getPublishedAt()
  * @method string getSource()
  */

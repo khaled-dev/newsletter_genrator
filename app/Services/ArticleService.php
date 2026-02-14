@@ -3,11 +3,15 @@
 namespace App\Services;
 
 use Exception;
-use App\Models\Article;
 use Illuminate\Support\Facades\Log;
+use App\Repositories\ArticleRepository;
 
 class ArticleService
 {
+    public function __construct(
+        protected ArticleRepository $articleRepository
+    ) {}
+
     public function createArticlesFromDtos(array $articleDtos, string $source): array
     {
         $created = 0;
@@ -15,69 +19,64 @@ class ArticleService
 
         $externalIds = array_map(fn($dto) => $dto->getExternalId(), $articleDtos);
 
-        $existingIds = Article::bySource($source)
-            ->whereIn('external_id', $externalIds)
-            ->pluck('external_id')
-            ->toArray();
+        $existingIds = $this->articleRepository->getExistingIdsBySource($externalIds, $source);
 
         $articlesToCreate = [];
+        $seenInBatch = [];
 
+        // Validate new articles, and prepare for batch insert
         foreach ($articleDtos as $articleDto) {
             $externalId = $articleDto->getExternalId();
 
-            // Skip if article already exists
             if (in_array($externalId, $existingIds)) {
                 $skipped++;
                 continue;
             }
 
-            // Prepare for batch insert
-            $articlesToCreate[] = [
-                'external_id' => $externalId,
-                'title' => $articleDto->getTitle(),
-                'description' => $articleDto->getDescription(),
-                'content' => $articleDto->getContent(),
-                'url' => $articleDto->getUrl(),
-                'image_url' => $articleDto->getImageUrl(),
-                'author_name' => $articleDto->getAuthorName(),
-                'published_at' => $articleDto->getPublishedAt(),
-                'source' => $articleDto->getSource(),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
+            if (isset($seenInBatch[$externalId])) {
+                $skipped++;
+                continue;
+            }
+
+            $seenInBatch[$externalId] = true;
+            $articlesToCreate[] = $this->articleRepository->mapForInsertion($articleDto);
             $created++;
         }
 
-        // Batch insert new articles if any
-        if (!empty($articlesToCreate)) {
-            try {
-                Article::query()->insert($articlesToCreate);
-            } catch (Exception $e) {
-                // Log the error for debugging
-                Log::error('Batch insert failed', [
-                    'source' => $source,
-                    'articles_count' => count($articlesToCreate),
-                    'error' => $e->getMessage()
-                ]);
-
-                // Fallback to individual inserts to identify problematic records
-                $actualCreated = 0;
-                foreach ($articlesToCreate as $articleData) {
-                    try {
-                        Article::create($articleData);
-                        $actualCreated++;
-                    } catch (\Exception $individualError) {
-                        Log::warning('Individual article insert failed', [
-                            'external_id' => $articleData['external_id'],
-                            'source' => $source,
-                            'error' => $individualError->getMessage()
-                        ]);
-                    }
-                }
-                $created = $actualCreated;
-                $skipped += (count($articlesToCreate) - $actualCreated);
-            }
+        if (empty($articlesToCreate)) {
+            return [
+                'created' => $created,
+                'skipped' => $skipped,
+            ];
         }
+
+        try {
+            $this->articleRepository->batchInsert($articlesToCreate);
+        } catch (Exception $e) {
+            // Fallback to individual inserts if batch insert fails, and log the error
+            Log::error('Batch insert failed', [
+                'source' => $source,
+                'articles_count' => count($articlesToCreate),
+                'error' => $e->getMessage()
+            ]);
+
+            $actualCreated = 0;
+            foreach ($articlesToCreate as $articleData) {
+                try {
+                    $this->articleRepository->create($articleData);
+                    $actualCreated++;
+                } catch (\Exception $individualError) {
+                    Log::warning('Individual article insert failed', [
+                        'external_id' => $articleData['external_id'],
+                        'source' => $source,
+                        'error' => $individualError->getMessage()
+                    ]);
+                }
+            }
+            $created = $actualCreated;
+            $skipped += (count($articlesToCreate) - $actualCreated);
+        }
+
 
         return [
             'created' => $created,
