@@ -16,11 +16,8 @@ class ArticleService
     {
         $created = 0;
         $skipped = 0;
-
         $externalIds = array_map(fn($dto) => $dto->getExternalId(), $articleDtos);
-
         $existingIds = $this->articleRepository->getExistingIdsBySource($externalIds, $source);
-
         $articlesToCreate = [];
         $seenInBatch = [];
 
@@ -76,7 +73,6 @@ class ArticleService
             $created = $actualCreated;
             $skipped += (count($articlesToCreate) - $actualCreated);
         }
-
 
         return [
             'created' => $created,
