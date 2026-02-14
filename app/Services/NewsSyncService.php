@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Log;
 use App\Services\NewsSource\NewsAPIGateway;
 use App\Services\NewsSource\NyTimesGateway;
 use App\Services\NewsSource\GuardianGateway;
+use App\Repositories\NewsSyncRunRepository;
 use App\Services\NewsSource\Contracts\NewsSourceContract;
 
 class NewsSyncService
@@ -19,7 +20,8 @@ class NewsSyncService
     ];
 
     public function __construct(
-        protected ArticleService $articleService
+        protected ArticleService $articleService,
+        protected NewsSyncRunRepository $syncRunRepository
     ) {}
 
     public function syncAllSources(): void
@@ -31,7 +33,7 @@ class NewsSyncService
 
     public function syncSource(string $source, NewsSourceContract $gateway): void
     {
-        $syncRun = NewsSyncRun::create([
+        $syncRun = $this->syncRunRepository->create([
             'source' => $source,
             'status' => 'running',
             'started_at' => now(),
@@ -40,23 +42,14 @@ class NewsSyncService
         try {
             $articles = $gateway->fetchArticles()->normalizeArticle();
 
-            $syncRun->update(['articles_fetched' => count($articles)]);
+            $this->syncRunRepository->update($syncRun, ['articles_fetched' => count($articles)]);
 
             // Use ArticleService to handle article creation
             $result = $this->articleService->createArticlesFromDtos($articles, $source);
             $created = $result['created'];
             $skipped = $result['skipped'];
 
-            $syncRun->update([
-                'status' => 'completed',
-                'completed_at' => now(),
-                'articles_created' => $created,
-                'articles_skipped' => $skipped,
-                'metadata' => [
-                    'sync_duration_seconds' => now()->diffInSeconds($syncRun->started_at),
-                    'processing_rate' => count($articles) > 0 ? ($created / count($articles)) * 100 : 0,
-                ]
-            ]);
+            $this->syncRunRepository->updateWithStatus(NewsSyncRun::STATUS_COMPLETED, $syncRun, $created, $skipped);
 
             Log::info("News sync completed", [
                 'source' => $source,
@@ -66,15 +59,12 @@ class NewsSyncService
             ]);
 
         } catch (Exception $e) {
-            $syncRun->update([
-                'status' => 'failed',
-                'completed_at' => now(),
-                'error_message' => $e->getMessage(),
-                'metadata' => [
-                    'sync_duration_seconds' => now()->diffInSeconds($syncRun->started_at),
-                    'error_trace' => $e->getTraceAsString(),
-                ]
-            ]);
+            $this->syncRunRepository->updateWithStatus(
+                NewsSyncRun::STATUS_FAILED, $syncRun,
+                0,
+                0,
+                ['error_message' => $e->getMessage(), 'error_trace' => $e->getTraceAsString()]
+            );
 
             Log::error("News sync failed", [
                 'source' => $source,
@@ -89,10 +79,7 @@ class NewsSyncService
         $stats = [];
 
         foreach (array_keys($this->gateways) as $source) {
-            $recentRuns = NewsSyncRun::bySource($source)
-                ->recent($days)
-                ->latest('started_at')
-                ->get();
+            $recentRuns = $this->syncRunRepository->getRecentBySource($source, $days);
 
             $stats[$source] = [
                 'total_runs' => $recentRuns->count(),
@@ -110,16 +97,12 @@ class NewsSyncService
 
     public function isSourceCurrentlyRunning(string $source): bool
     {
-        return NewsSyncRun::bySource($source)
-            ->running()
-            ->exists();
+        return $this->syncRunRepository->isSourceRunning($source);
     }
 
     public function getFailedSyncs(int $hours = 24): array
     {
-        return NewsSyncRun::failed()
-            ->recentHours($hours)
-            ->get()
+        return $this->syncRunRepository->getFailedSyncs($hours)
             ->map(function ($run) {
                 return [
                     'source' => $run->source,

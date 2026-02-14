@@ -28,6 +28,9 @@ class NewsSyncRun extends Model
         'articles_skipped' => 'integer',
     ];
 
+    public const STATUS_COMPLETED = 'completed';
+    public const STATUS_FAILED = 'failed';
+
     public function scopeBySource(Builder $query, string $source): Builder
     {
         return $query->where('source', $source);
