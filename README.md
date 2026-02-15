@@ -177,7 +177,7 @@ GET /api/v1/authors
 The application runs with the following Docker services:
 
 ### Core Services
-- **app**: Main Laravel application with PHP 8.2-FPM
+- **app**: Main Laravel application with PHP 8.3-FPM
 - **db**: PostgreSQL 16 database with automatic health checks
 - **redis**: Redis 7 for caching and queue management
 
@@ -329,3 +329,39 @@ DB_DATABASE=news_aggregator
 DB_USERNAME=postgres
 DB_PASSWORD=secret
 ```
+
+## Testing
+
+The application includes minimal test coverage for core functionality using a **dedicated PostgreSQL testing database** for realistic testing conditions.
+
+### Running Tests
+```bash
+# Run all tests
+docker-compose exec app php artisan test
+
+# Run specific test files
+docker-compose exec app php artisan test tests/Unit/GatewayTest.php
+docker-compose exec app php artisan test tests/Feature/ArticleApiTest.php
+docker-compose exec app php artisan test tests/Unit/ScheduleTest.php
+
+# Verbose output
+docker-compose exec app php artisan test --verbose
+```
+
+### Test Coverage
+- **Gateway Tests**: Mock API responses for all three news sources (Guardian, NewsAPI, NY Times)
+- **API Endpoint Tests**: Test filtering by source, author, date, and search functionality
+- **Schedule Tests**: Verify scheduling configuration and command existence
+
+### Database Configuration
+Tests use a **dedicated PostgreSQL testing database** (`news_aggregator_testing`) for:
+- 🎯 **Realistic testing** - Same database engine as production
+- 🔍 **Full-text search testing** - PostgreSQL-specific features work properly
+- 🏗️ **Migration testing** - Ensure migrations work correctly
+- 🔄 **RefreshDatabase** - Clean slate for each test
+
+The testing database is automatically created by the PostgreSQL init script and uses the same extensions as the production database.
+
+See [TESTING.md](TESTING.md) for detailed test documentation.
+
+## Troubleshooting
