@@ -28,7 +28,11 @@ return new class extends Migration
             $table->index(['source', 'published_at']);
             $table->index('published_at');
             $table->index('title');
-            $table->fullText(['title', 'description']);
+
+            // Full-text search only for non-SQLite databases
+            if (config('database.default') !== 'sqlite') {
+                $table->fullText(['title', 'description']);
+            }
         });
     }
 

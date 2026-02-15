@@ -20,6 +20,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      db_test:
+        condition: service_healthy
       redis:
         condition: service_started
 
@@ -30,10 +32,27 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: secret
     volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - pgdata_dev_2:/var/lib/postgresql/data
+      - ./postgress/init-dev.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  db_test:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: news_aggregator_testing
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - pgdata_tst_2:/var/lib/postgresql/data
+      - ./postgress/init-test.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5433:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -59,6 +78,8 @@ services:
         condition: service_started
       db:
         condition: service_healthy
+      db_test:
+        condition: service_healthy
       redis:
         condition: service_started
 
@@ -74,7 +95,10 @@ services:
         condition: service_started
       db:
         condition: service_healthy
+      db_test:
+        condition: service_healthy
 
 volumes:
-  pgdata:
+  pgdata_dev_2:
+  pgdata_tst_2:
   redisdata:
