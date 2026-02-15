@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Exception;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Log;
 use App\Repositories\ArticleRepository;
 
@@ -78,5 +79,15 @@ class ArticleService
             'created' => $created,
             'skipped' => $skipped,
         ];
+    }
+
+    public function searchWithFilters(array $filters, int $perPage = 20): LengthAwarePaginator
+    {
+        return $this->articleRepository->searchWithFilters($filters, $perPage);
+    }
+
+    public function getDistinctAuthors(): array
+    {
+        return $this->articleRepository->getDistinctAuthors();
     }
 }

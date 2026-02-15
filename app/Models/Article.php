@@ -29,9 +29,9 @@ class Article extends Model
         return $query->where('source', $source);
     }
 
-    public function scopePublishedAfter(Builder $query, Carbon $date): Builder
+    public function scopeByAuthor(Builder $query, string $author): Builder
     {
-        return $query->where('published_at', '>=', $date);
+        return $query->where('author_name', 'ILIKE', "%{$author}%");
     }
 
     public function scopeSearch(Builder $query, string $search): Builder

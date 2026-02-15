@@ -12,4 +12,13 @@ enum Sources: string
     {
         return __("sources.{$this->value}");
     }
+
+    public static function allValues(): array
+    {
+        return [
+            self::GUARDIAN->value,
+            self::NEWS_API->value,
+            self::NY_TIMES->value,
+        ];
+    }
 }

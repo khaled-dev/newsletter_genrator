@@ -4,7 +4,7 @@ namespace App\Repositories;
 
 use App\Models\Article;
 use App\DTOs\Article as ArticleDto;
-use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class ArticleRepository
 {
@@ -30,34 +30,24 @@ class ArticleRepository
         return $this->model->create($articleData);
     }
 
-    public function findById(int $id): ?Article
-    {
-        return $this->model->find($id);
-    }
-
-    public function findByIdOrFail(int $id): Article
-    {
-        return $this->model->findOrFail($id);
-    }
-
     public function mapForInsertion(ArticleDto $articleDto): array
     {
         return [
-                'external_id' => $articleDto->getExternalId(),
-                'title' => $articleDto->getTitle(),
-                'description' => $articleDto->getDescription(),
-                'content' => $articleDto->getContent(),
-                'url' => $articleDto->getUrl(),
-                'image_url' => $articleDto->getImageUrl(),
-                'author_name' => $articleDto->getAuthorName(),
-                'published_at' => $articleDto->getPublishedAt(),
-                'source' => $articleDto->getSource(),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
+            'external_id' => $articleDto->getExternalId(),
+            'title' => $articleDto->getTitle(),
+            'description' => $articleDto->getDescription(),
+            'content' => $articleDto->getContent(),
+            'url' => $articleDto->getUrl(),
+            'image_url' => $articleDto->getImageUrl(),
+            'author_name' => $articleDto->getAuthorName(),
+            'published_at' => $articleDto->getPublishedAt(),
+            'source' => $articleDto->getSource(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
     }
 
-    public function searchWithFilters(array $filters, int $perPage = 20): \Illuminate\Contracts\Pagination\LengthAwarePaginator
+    public function searchWithFilters(array $filters, int $perPage = 20): LengthAwarePaginator
     {
         $query = $this->model->query();
 
@@ -65,12 +55,20 @@ class ArticleRepository
             $query->bySource($filters['source']);
         }
 
-        if (isset($filters['from_date'])) {
-            $query->publishedAfter(\Carbon\Carbon::parse($filters['from_date']));
+        if (isset($filters['author'])) {
+            $query->byAuthor($filters['author']);
+        }
+
+        if (isset($filters['publish_date'])) {
+            $query->whereDate('published_at', $filters['publish_date']);
         }
 
         if (isset($filters['search'])) {
-            $query->search($filters['search']);
+            $query->where(function($q) use ($filters) {
+                $search = $filters['search'];
+                $q->where('title', 'ILIKE', "%{$search}%")
+                  ->orWhere('author_name', 'ILIKE', "%{$search}%");
+            });
         }
 
         $query->latest();
@@ -78,20 +76,18 @@ class ArticleRepository
         return $query->paginate($perPage);
     }
 
-    public function searchByQuery(string $searchQuery, array $filters = [], int $perPage = 20): \Illuminate\Contracts\Pagination\LengthAwarePaginator
+    public function getDistinctAuthors(): array
     {
-        $query = $this->model->search($searchQuery);
-
-        if (isset($filters['source'])) {
-            $query->bySource($filters['source']);
-        }
-
-        if (isset($filters['from_date'])) {
-            $query->publishedAfter(\Carbon\Carbon::parse($filters['from_date']));
-        }
-
-        $query->latest();
-
-        return $query->paginate($perPage);
+        return $this->model->query()
+            ->select('author_name')
+            ->whereNotNull('author_name')
+            ->where('author_name', '!=', '')
+            ->distinct()
+            ->pluck('author_name')
+            ->map(fn($author) => [
+                'name' => $author,
+                'value' => $author,
+            ])
+            ->toArray();
     }
 }
