@@ -6,11 +6,9 @@ use Tests\TestCase;
 use App\Console\Commands\SyncNewsArticles;
 use App\Services\NewsSyncService;
 use Illuminate\Console\Scheduling\Schedule;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 
 class ScheduleTest extends TestCase
 {
-    use RefreshDatabase;
 
     public function test_news_sync_command_exists()
     {

@@ -4,12 +4,9 @@ namespace Tests\Feature;
 
 use Tests\TestCase;
 use App\Models\Article;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 
 class ArticleApiTest extends TestCase
 {
-    use RefreshDatabase;
-
     protected function setUp(): void
     {
         parent::setUp();
